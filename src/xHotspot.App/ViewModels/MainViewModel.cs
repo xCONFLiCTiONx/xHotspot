@@ -25,13 +25,10 @@ public partial class MainViewModel : ObservableObject
     private string _hotspotStatus = "Off";
 
     [ObservableProperty]
-    private string _turnOffTime = "23:00";
-
-    [ObservableProperty]
     private bool _automationPaused;
 
     [ObservableProperty]
-    private string _automationStatusText = "Active";
+    private string _automationStatusText = "Always-On Active";
 
     [ObservableProperty]
     private string _automationButtonText = "Pause Automation";
@@ -68,9 +65,8 @@ public partial class MainViewModel : ObservableObject
                 WifiSsid = string.IsNullOrEmpty(dto.WifiSsid) ? "Connected" : dto.WifiSsid;
                 InternetConnected = dto.InternetConnected;
                 PhoneName = string.IsNullOrEmpty(dto.PhoneName) ? "Samsung Galaxy S23 FE" : dto.PhoneName;
-                TurnOffTime = string.IsNullOrEmpty(dto.TurnOffTime) ? "23:00" : dto.TurnOffTime;
                 AutomationPaused = dto.AutomationPaused;
-                AutomationStatusText = AutomationPaused ? "Paused" : "Active (Phone Connect)";
+                AutomationStatusText = AutomationPaused ? "Paused" : "Always-On Active";
                 AutomationButtonText = AutomationPaused ? "Resume Automation" : "Pause Automation";
             }
         }

@@ -15,8 +15,6 @@ public class Worker : BackgroundService
     private readonly INetworkMonitor _networkMonitor;
     private readonly NamedPipeServer _ipcServer;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
-    private bool _scheduledOffTriggeredToday = false;
-    private DateTime _lastDayChecked = DateTime.Today;
 
     public Worker(
         ILoggerService logger,
@@ -36,8 +34,8 @@ public class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("xHotspot service starting...");
-        Console.WriteLine(">>> [DEBUG] xHotspot Service Worker starting execution loop (Phone Connect Start + Scheduled Stop mode)...");
+        _logger.LogInformation("xHotspot service starting (Always-On Mode)...");
+        Console.WriteLine(">>> [DEBUG] xHotspot Service Worker starting execution loop (Always-On Mode)...");
 
         try
         {
@@ -96,12 +94,11 @@ public class Worker : BackgroundService
     {
         if (e.Mode == PowerModes.Resume)
         {
-            Console.WriteLine(">>> [DEBUG] Power mode resume detected.");
-            _logger.LogInformation("System resumed from sleep. Triggering stabilization and recovery...");
+            Console.WriteLine(">>> [DEBUG] Power mode resume detected. Forcing hotspot ON...");
+            _logger.LogInformation("System resumed from sleep. Forcing Mobile Hotspot ON...");
             _ = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(3));
-                _scheduledOffTriggeredToday = false;
+                await Task.Delay(TimeSpan.FromSeconds(2));
                 await EvaluateAndRecoverAsync();
             });
         }
@@ -119,87 +116,25 @@ public class Worker : BackgroundService
             var settings = _settingsService.LoadSettings();
             if (!settings.Enabled || settings.AutomationPaused)
             {
-                Console.WriteLine(">>> [DEBUG] Automation is disabled or paused.");
+                Console.WriteLine(">>> [DEBUG] Automation is disabled or paused. Hotspot will not be forced on.");
                 return;
             }
 
-            // Calendar-aware day check
-            var today = DateTime.Today;
-            if (today != _lastDayChecked)
-            {
-                _lastDayChecked = today;
-                _scheduledOffTriggeredToday = false;
-            }
-
-            bool isDayEnabled = today.DayOfWeek switch
-            {
-                DayOfWeek.Monday => settings.EnableMonday,
-                DayOfWeek.Tuesday => settings.EnableTuesday,
-                DayOfWeek.Wednesday => settings.EnableWednesday,
-                DayOfWeek.Thursday => settings.EnableThursday,
-                DayOfWeek.Friday => settings.EnableFriday,
-                DayOfWeek.Saturday => settings.EnableSaturday,
-                DayOfWeek.Sunday => settings.EnableSunday,
-                _ => true
-            };
-
-            var now = DateTime.Now.TimeOfDay;
-            bool hasStopReached = false;
-            if (TimeSpan.TryParse(settings.TurnOffTime, out var turnOffTime))
-            {
-                if (now >= turnOffTime)
-                {
-                    hasStopReached = true;
-                }
-            }
-
-            // 1. If scheduled stop time reached, turn off hotspot
-            if (hasStopReached && !_scheduledOffTriggeredToday)
-            {
-                Console.WriteLine($">>> [SCHEDULE] Current time {now:hh\\:mm} reached or passed stop time {settings.TurnOffTime}. Turning OFF Mobile Hotspot.");
-                _logger.LogInformation($"Scheduled stop time reached ({settings.TurnOffTime}). Disabling Mobile Hotspot.");
-                await _hotspotManager.DisableAsync(cancellationToken);
-                _scheduledOffTriggeredToday = true;
-                return;
-            }
-
-            // 2. Check Phone Link connection state
-            bool phoneConnected = await _phoneLinkMonitor.IsPhoneLinkConnectedAsync(cancellationToken);
             var hotspotStatus = await _hotspotManager.GetStatusAsync(cancellationToken);
-            Console.WriteLine($">>> [DEBUG] Phone connected: {phoneConnected}, Hotspot status: {hotspotStatus}, Day enabled: {isDayEnabled}, Stop reached: {hasStopReached}, Scheduled off today: {_scheduledOffTriggeredToday}");
+            Console.WriteLine($">>> [DEBUG] Always-on evaluation: Hotspot status = {hotspotStatus}");
 
-            if (!isDayEnabled)
+            if (hotspotStatus == HotspotStatus.Off)
             {
-                Console.WriteLine(">>> [SCHEDULE] Today is not enabled in schedule. Hotspot automation inactive.");
-                return;
-            }
-
-            if (hasStopReached)
-            {
-                Console.WriteLine(">>> [SCHEDULE] Scheduled window has ended. Hotspot remains OFF for new connections tonight.");
-                return;
-            }
-
-            // Start condition: Phone connects and stop not reached and day enabled and not scheduled off
-            if (phoneConnected && hotspotStatus == HotspotStatus.Off && !hasStopReached && !_scheduledOffTriggeredToday)
-            {
-                _logger.LogInformation("Phone connected to Phone Link during active schedule window. Enabling Mobile Hotspot...");
-                Console.WriteLine(">>> [DEBUG] Phone connected and hotspot OFF. Turning hotspot ON.");
+                _logger.LogInformation("Hotspot is OFF while automation is active. Forcing Mobile Hotspot ON...");
+                Console.WriteLine(">>> [ALWAYS-ON] Hotspot is OFF. Forcing Mobile Hotspot ON...");
                 bool success = await _hotspotManager.EnableAsync(cancellationToken);
-                Console.WriteLine($">>> [DEBUG] EnableAsync result: {success}");
-            }
-            else if (!phoneConnected && hotspotStatus == HotspotStatus.On && settings.DisableOnDisconnect)
-            {
-                Console.WriteLine(">>> [DEBUG] Phone disconnected from Phone Link and DisableOnDisconnect is enabled. Turning hotspot OFF.");
-                _logger.LogInformation("Phone disconnected from Phone Link. Disabling Mobile Hotspot.");
-                await _hotspotManager.DisableAsync(cancellationToken);
+                Console.WriteLine($">>> [ALWAYS-ON] EnableAsync result: {success}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RECOVERY EVALUATION ERROR] {ex}");
-            _logger.LogError("Error during recovery evaluation", ex);
-            throw;
+            Console.WriteLine($"[ALWAYS-ON EVALUATION ERROR] {ex}");
+            _logger.LogError("Error during always-on hotspot evaluation", ex);
         }
         finally
         {
