@@ -19,10 +19,16 @@ public partial class MainViewModel : ObservableObject
     private string _hotspotStatus = "Off";
 
     [ObservableProperty]
-    private string _automationStatusText = "Always-On Active";
+    private string _automationStatusText = "Manual Mode";
 
     [ObservableProperty]
     private string _toggleButtonText = "Enable Hotspot";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNotBusy))]
+    private bool _isBusy;
+
+    public bool IsNotBusy => !IsBusy;
 
     public MainViewModel()
     {
@@ -45,15 +51,23 @@ public partial class MainViewModel : ObservableObject
         var currentStatus = await app.HotspotManager.GetStatusAsync();
         HotspotStatus = currentStatus.ToString();
 
-        if (currentStatus == xHotspot.Core.Models.HotspotStatus.On || currentStatus == xHotspot.Core.Models.HotspotStatus.TurningOn)
+        if (currentStatus == xHotspot.Core.Models.HotspotStatus.TurningOn)
         {
+            IsBusy = true;
+            ToggleButtonText = "Enabling...";
+            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active" : "Manual Mode";
+        }
+        else if (currentStatus == xHotspot.Core.Models.HotspotStatus.On)
+        {
+            IsBusy = false;
             ToggleButtonText = "Disable Hotspot";
-            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active" : "Manual";
+            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active" : "Manual Mode";
         }
         else
         {
+            if (!app.IsBusy) IsBusy = false;
             ToggleButtonText = "Enable Hotspot";
-            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active (Reconnecting...)" : "Disabled";
+            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active (Reconnecting...)" : "Manual Mode";
         }
     }
 
@@ -63,8 +77,16 @@ public partial class MainViewModel : ObservableObject
         var app = App.Current;
         if (app != null)
         {
-            await app.ToggleHotspotAsync();
-            await RefreshStatusAsync();
+            IsBusy = true;
+            try
+            {
+                await app.ToggleHotspotAsync();
+            }
+            finally
+            {
+                IsBusy = false;
+                await RefreshStatusAsync();
+            }
         }
     }
 }

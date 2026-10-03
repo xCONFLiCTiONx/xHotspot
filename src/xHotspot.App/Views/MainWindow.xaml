@@ -12,6 +12,8 @@
     </Window.DataContext>
 
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+
         <Style TargetType="Button">
             <Setter Property="Background" Value="#2D2D2D"/>
             <Setter Property="Foreground" Value="White"/>
@@ -33,6 +35,10 @@
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#3E3E3E"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#1A1A1A"/>
+                    <Setter Property="Foreground" Value="#666666"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -64,9 +70,14 @@
                 </StackPanel>
             </Border>
 
-            <Grid HorizontalAlignment="Center" Margin="0,25,0,0">
+            <ProgressBar IsIndeterminate="True" Height="4" Margin="0,15,0,0"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"
+                         Foreground="#2196F3" Background="#333333" BorderThickness="0"/>
+
+            <Grid HorizontalAlignment="Center" Margin="0,15,0,0">
                 <Button Content="{Binding ToggleButtonText}"
                         Command="{Binding ToggleHotspotCommand}"
+                        IsEnabled="{Binding IsNotBusy}"
                         Width="280" Height="40" FontSize="14" FontWeight="SemiBold"/>
             </Grid>
         </StackPanel>

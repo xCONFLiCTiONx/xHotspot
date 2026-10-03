@@ -27,7 +27,8 @@ public partial class App : Application
     private readonly LoggerService _logger = new();
 
     public WindowsHotspotManager HotspotManager { get; }
-    public bool IsAutoReenableEnabled { get; set; } = true;
+    public bool IsAutoReenableEnabled { get; set; } = false; // Only true when started with --startup or manually enabled
+    public bool IsBusy { get; private set; }
 
     public static new App Current => (App)Application.Current;
 
@@ -74,7 +75,6 @@ public partial class App : Application
 
         _notifyIcon = new TaskbarIcon
         {
-            ToolTipText = "xHotspot — Always-On Mobile Hotspot",
             Icon = trayIcon
         };
 
@@ -93,9 +93,8 @@ public partial class App : Application
         contextMenu.Items.Add(new System.Windows.Controls.Separator());
 
         var exitItem = new System.Windows.Controls.MenuItem { Header = "Exit" };
-        exitItem.Click += (s, args) => {
-            _notifyIcon?.Dispose();
-            Current.Shutdown();
+        exitItem.Click += async (s, args) => {
+            await ExitApplicationAsync();
         };
         contextMenu.Items.Add(exitItem);
 
@@ -113,15 +112,33 @@ public partial class App : Application
 
         if (isStartup)
         {
-            // Started via --startup: run in system tray and immediately enable hotspot
+            // Started via --startup argument: enable hotspot immediately & run in background
             IsAutoReenableEnabled = true;
             _ = EnableHotspotAsync();
         }
         else
         {
-            // Started manually: open GUI window directly
+            // Started manually: do NOT auto-connect; open GUI window
+            IsAutoReenableEnabled = false;
             ShowMainWindow();
         }
+    }
+
+    private async Task ExitApplicationAsync()
+    {
+        _logger.LogInformation("Exit requested. Disabling Mobile Hotspot before exiting...");
+        IsAutoReenableEnabled = false;
+        try
+        {
+            await HotspotManager.DisableAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error disabling hotspot on exit", ex);
+        }
+
+        _notifyIcon?.Dispose();
+        Current.Shutdown();
     }
 
     private static void SignalPrimaryInstanceToShowGui()
@@ -187,18 +204,34 @@ public partial class App : Application
 
     public async Task EnableHotspotAsync()
     {
+        IsBusy = true;
         IsAutoReenableEnabled = true;
-        _logger.LogInformation("Enabling Hotspot and activating Auto-Reenable...");
-        await HotspotManager.EnableAsync();
-        await UpdateTrayMenuAsync();
+        _logger.LogInformation("Enabling Hotspot...");
+        try
+        {
+            await HotspotManager.EnableAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+            await UpdateTrayMenuAsync();
+        }
     }
 
     public async Task DisableHotspotAsync()
     {
+        IsBusy = true;
         IsAutoReenableEnabled = false;
-        _logger.LogInformation("Disabling Hotspot and pausing Auto-Reenable...");
-        await HotspotManager.DisableAsync();
-        await UpdateTrayMenuAsync();
+        _logger.LogInformation("Disabling Hotspot...");
+        try
+        {
+            await HotspotManager.DisableAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+            await UpdateTrayMenuAsync();
+        }
     }
 
     public async Task ToggleHotspotAsync()
@@ -254,7 +287,7 @@ public partial class App : Application
         if (e.Mode == PowerModes.Resume)
         {
             _logger.LogInformation("System resumed from sleep. Checking Mobile Hotspot status...");
-            Console.WriteLine(">>> [APP] Power resume detected. Waiting for network interfaces and re-enabling hotspot...");
+            Console.WriteLine(">>> [APP] Power resume detected. Checking hotspot state...");
             _ = Task.Run(async () =>
             {
                 await Task.Delay(2500); // Allow Wi-Fi / network interfaces to re-initialize
