@@ -11,12 +11,36 @@ public partial class MainWindow : Window
         InitializeComponent();
         try
         {
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
-            if (File.Exists(iconPath))
+            var streamInfo = Application.GetResourceStream(new Uri("pack://application:,,,/logo.ico"));
+            if (streamInfo != null)
             {
-                Icon = new BitmapImage(new Uri(iconPath));
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.StreamSource = streamInfo.Stream;
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                Icon = bitmap;
+            }
+            else
+            {
+                string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
+                if (File.Exists(iconPath))
+                {
+                    Icon = new BitmapImage(new Uri(iconPath));
+                }
             }
         }
-        catch { }
+        catch
+        {
+            try
+            {
+                string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
+                if (File.Exists(iconPath))
+                {
+                    Icon = new BitmapImage(new Uri(iconPath));
+                }
+            }
+            catch { }
+        }
     }
 }

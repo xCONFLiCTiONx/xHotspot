@@ -2,13 +2,13 @@
   <PropertyGroup>
     <UseWpf>true</UseWpf>
     <OutputType>WinExe</OutputType>
-    <ApplicationIcon>..\..\icon.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\icon.ico" Link="icon.ico">
+    <Resource Include="..\..\logo.ico" Link="logo.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Resource>
   </ItemGroup>
 
   <ItemGroup>

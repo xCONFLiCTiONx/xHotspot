@@ -93,16 +93,37 @@ public partial class App : Application
         }
     }
 
+    private System.Drawing.Icon GetAppIcon()
+    {
+        try
+        {
+            var streamInfo = Application.GetResourceStream(new Uri("pack://application:,,,/logo.ico"));
+            if (streamInfo != null)
+            {
+                using var stream = streamInfo.Stream;
+                return new System.Drawing.Icon(stream);
+            }
+        }
+        catch { }
+
+        try
+        {
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
+            if (File.Exists(iconPath))
+            {
+                return new System.Drawing.Icon(iconPath);
+            }
+        }
+        catch { }
+
+        return System.Drawing.SystemIcons.Application;
+    }
+
     private void InitializeTrayIcon()
     {
-        string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
-        System.Drawing.Icon trayIcon = File.Exists(iconPath)
-            ? new System.Drawing.Icon(iconPath)
-            : System.Drawing.SystemIcons.Application;
-
         _notifyIcon = new TaskbarIcon
         {
-            Icon = trayIcon
+            Icon = GetAppIcon()
         };
 
         var contextMenu = new System.Windows.Controls.ContextMenu();
@@ -110,6 +131,10 @@ public partial class App : Application
         var openItem = new System.Windows.Controls.MenuItem { Header = "Open" };
         openItem.Click += (s, args) => ShowMainWindow();
         contextMenu.Items.Add(openItem);
+
+        var hotspotInfoItem = new System.Windows.Controls.MenuItem { Header = "Hotspot Info" };
+        hotspotInfoItem.Click += (s, args) => OpenHotspotSettings();
+        contextMenu.Items.Add(hotspotInfoItem);
 
         contextMenu.Items.Add(new System.Windows.Controls.Separator());
 
@@ -127,6 +152,21 @@ public partial class App : Application
 
         _notifyIcon.ContextMenu = contextMenu;
         _notifyIcon.TrayMouseDoubleClick += (s, args) => ShowMainWindow();
+    }
+
+    private void OpenHotspotSettings()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:network-mobilehotspot")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to open Windows Mobile Hotspot settings", ex);
+        }
     }
 
     private async Task ExitApplicationAsync()
