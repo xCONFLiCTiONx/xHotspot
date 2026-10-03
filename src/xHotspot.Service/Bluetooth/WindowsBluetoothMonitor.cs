@@ -20,72 +20,132 @@ public class WindowsBluetoothMonitor : IBluetoothMonitor
     public async Task<IReadOnlyList<BluetoothDeviceItem>> GetPairedDevicesAsync(CancellationToken cancellationToken = default)
     {
         var list = new List<BluetoothDeviceItem>();
-        string aqs = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
-        var devices = await DeviceInformation.FindAllAsync(aqs);
+        var seenIds = new HashSet<string>();
 
-        foreach (var dev in devices)
+        try
         {
-            list.Add(new BluetoothDeviceItem
+            string aqsClassic = BluetoothDevice.GetDeviceSelectorFromPairingState(true);
+            var devicesClassic = await DeviceInformation.FindAllAsync(aqsClassic);
+            foreach (var dev in devicesClassic)
             {
-                DeviceId = dev.Id,
-                Name = dev.Name,
-                State = BluetoothDeviceState.Paired,
-                IsConnected = dev.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var conn) && conn is bool b && b
-            });
+                if (seenIds.Add(dev.Id))
+                {
+                    bool connected = dev.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var conn) && conn is bool b && b;
+                    list.Add(new BluetoothDeviceItem
+                    {
+                        DeviceId = dev.Id,
+                        Name = string.IsNullOrEmpty(dev.Name) ? "Unknown Bluetooth Device" : dev.Name,
+                        State = connected ? BluetoothDeviceState.Connected : BluetoothDeviceState.Paired,
+                        IsConnected = connected
+                    });
+                }
+            }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[BLUETOOTH CLASSIC QUERY ERROR] {ex}");
+            _logger.LogError("Failed to query classic Bluetooth devices", ex);
+        }
+
+        try
+        {
+            string aqsBle = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
+            var devicesBle = await DeviceInformation.FindAllAsync(aqsBle);
+            foreach (var dev in devicesBle)
+            {
+                if (seenIds.Add(dev.Id))
+                {
+                    bool connected = dev.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var conn) && conn is bool b && b;
+                    list.Add(new BluetoothDeviceItem
+                    {
+                        DeviceId = dev.Id,
+                        Name = string.IsNullOrEmpty(dev.Name) ? "Unknown BLE Device" : dev.Name,
+                        State = connected ? BluetoothDeviceState.Connected : BluetoothDeviceState.Paired,
+                        IsConnected = connected
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[BLUETOOTH BLE QUERY ERROR] {ex}");
+            _logger.LogError("Failed to query BLE devices", ex);
+        }
+
         return list;
     }
 
     public async Task<BluetoothDeviceItem?> GetDeviceStateAsync(string deviceId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(deviceId)) return null;
-        var devInfo = await DeviceInformation.CreateFromIdAsync(deviceId);
-        if (devInfo != null)
+        try
         {
-            bool connected = devInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var conn) && conn is bool b && b;
-            return new BluetoothDeviceItem
+            if (string.IsNullOrEmpty(deviceId)) return null;
+            var devInfo = await DeviceInformation.CreateFromIdAsync(deviceId);
+            if (devInfo != null)
             {
-                DeviceId = devInfo.Id,
-                Name = devInfo.Name,
-                State = connected ? BluetoothDeviceState.Connected : BluetoothDeviceState.Available,
-                IsConnected = connected
-            };
+                bool connected = devInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var conn) && conn is bool b && b;
+                return new BluetoothDeviceItem
+                {
+                    DeviceId = devInfo.Id,
+                    Name = devInfo.Name,
+                    State = connected ? BluetoothDeviceState.Connected : BluetoothDeviceState.Available,
+                    IsConnected = connected
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DEVICE STATE ERROR] {ex}");
+            _logger.LogError($"Failed to get state for device {deviceId}", ex);
         }
         return null;
     }
 
     public Task StartMonitoringAsync(CancellationToken cancellationToken = default)
     {
-        string aqs = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
-        _deviceWatcher = DeviceInformation.CreateWatcher(aqs, new[] { "System.Devices.Aep.IsConnected" }, DeviceInformationKind.AssociationEndpoint);
-
-        _deviceWatcher.Updated += async (watcher, args) =>
+        try
         {
-            try
-            {
-                var item = await GetDeviceStateAsync(args.Id);
-                if (item != null)
-                {
-                    DeviceStateChanged?.Invoke(this, item);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[BLUETOOTH WATCHER ERROR] {ex}");
-                _logger.LogError("Error in device watcher update", ex);
-            }
-        };
+            string aqs = BluetoothDevice.GetDeviceSelectorFromPairingState(true);
+            _deviceWatcher = DeviceInformation.CreateWatcher(aqs);
 
-        _deviceWatcher.Start();
-        _logger.LogInformation("WindowsBluetoothMonitor started.");
+            _deviceWatcher.Updated += async (watcher, args) =>
+            {
+                try
+                {
+                    var item = await GetDeviceStateAsync(args.Id);
+                    if (item != null)
+                    {
+                        DeviceStateChanged?.Invoke(this, item);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[BLUETOOTH WATCHER ERROR] {ex}");
+                }
+            };
+
+            _deviceWatcher.Start();
+            _logger.LogInformation("WindowsBluetoothMonitor started.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[BLUETOOTH MONITOR START ERROR] {ex}");
+        }
         return Task.CompletedTask;
     }
 
     public Task StopMonitoringAsync()
     {
-        _deviceWatcher?.Stop();
-        _deviceWatcher = null;
-        _logger.LogInformation("WindowsBluetoothMonitor stopped.");
+        try
+        {
+            _deviceWatcher?.Stop();
+            _deviceWatcher = null;
+            _logger.LogInformation("WindowsBluetoothMonitor stopped.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[BLUETOOTH MONITOR STOP ERROR] {ex}");
+        }
         return Task.CompletedTask;
     }
 }

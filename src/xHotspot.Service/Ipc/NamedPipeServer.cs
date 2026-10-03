@@ -14,7 +14,7 @@ public class NamedPipeServer
     private readonly ILoggerService _logger;
     private readonly ISettingsService _settingsService;
     private readonly IHotspotManager _hotspotManager;
-    private readonly IBluetoothMonitor _bluetoothMonitor;
+    private readonly IPhoneLinkMonitor _phoneLinkMonitor;
     private readonly INetworkMonitor _networkMonitor;
     private CancellationTokenSource? _cts;
     private Task? _listenerTask;
@@ -23,13 +23,13 @@ public class NamedPipeServer
         ILoggerService logger,
         ISettingsService settingsService,
         IHotspotManager hotspotManager,
-        IBluetoothMonitor bluetoothMonitor,
+        IPhoneLinkMonitor phoneLinkMonitor,
         INetworkMonitor networkMonitor)
     {
         _logger = logger;
         _settingsService = settingsService;
         _hotspotManager = hotspotManager;
-        _bluetoothMonitor = bluetoothMonitor;
+        _phoneLinkMonitor = phoneLinkMonitor;
         _networkMonitor = networkMonitor;
     }
 
@@ -93,6 +93,14 @@ public class NamedPipeServer
             var jsonResponse = JsonSerializer.Serialize(response);
             await writer.WriteLineAsync(jsonResponse);
         }
+        catch (ObjectDisposedException)
+        {
+            // Client closed pipe
+        }
+        catch (IOException)
+        {
+            // Client closed pipe
+        }
         catch (Exception ex)
         {
             Console.WriteLine($"[IPC CLIENT HANDLER ERROR] {ex}");
@@ -132,8 +140,12 @@ public class NamedPipeServer
                     return new IpcResponse { Success = false, ErrorMessage = "Invalid settings payload" };
 
                 case IpcCommandType.GetDevices:
-                    var devices = await _bluetoothMonitor.GetPairedDevicesAsync();
-                    return new IpcResponse { Success = true, DataJson = JsonSerializer.Serialize(devices) };
+                    bool plConnected = await _phoneLinkMonitor.IsPhoneLinkConnectedAsync();
+                    var list = new List<BluetoothDeviceItem>
+                    {
+                        new BluetoothDeviceItem { Name = "Windows Phone Link", IsConnected = plConnected }
+                    };
+                    return new IpcResponse { Success = true, DataJson = JsonSerializer.Serialize(list) };
 
                 case IpcCommandType.EnableHotspot:
                     bool en = await _hotspotManager.EnableAsync();

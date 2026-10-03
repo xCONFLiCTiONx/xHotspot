@@ -13,4 +13,5 @@ public class AppSettings
     public int RetryIntervalSeconds { get; set; } = 30;
     public int StartupDelaySeconds { get; set; } = 10;
     public bool AutomationPaused { get; set; } = false;
+    public string TurnOffTime { get; set; } = "23:00"; // Scheduled turn-off time (24-hour format)
 }

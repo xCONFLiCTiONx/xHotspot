@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using xHotspot.Core.Interfaces;
 using xHotspot.Core.Models;
-using xHotspot.Service.Bluetooth;
 using xHotspot.Service.Hotspot;
 using xHotspot.Service.Ipc;
 using xHotspot.Service.Network;
@@ -32,7 +31,7 @@ public class Program
                 services.AddSingleton<ILoggerService, LoggerService>();
                 services.AddSingleton<ISettingsService, SettingsService>();
                 services.AddSingleton<IHotspotManager, WindowsHotspotManager>();
-                services.AddSingleton<IBluetoothMonitor, WindowsBluetoothMonitor>();
+                services.AddSingleton<IPhoneLinkMonitor, WindowsPhoneLinkMonitor>();
                 services.AddSingleton<INetworkMonitor, WindowsNetworkMonitor>();
                 services.AddSingleton<NamedPipeServer>();
                 services.AddHostedService<Worker>();
