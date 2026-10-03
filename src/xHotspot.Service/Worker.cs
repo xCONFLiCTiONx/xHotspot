@@ -37,7 +37,7 @@ public class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("xHotspot service starting...");
-        Console.WriteLine(">>> [DEBUG] xHotspot Service Worker starting execution loop (Phone Link + Schedule mode)...");
+        Console.WriteLine(">>> [DEBUG] xHotspot Service Worker starting execution loop (Phone Connect Start + Scheduled Stop mode)...");
 
         try
         {
@@ -82,10 +82,7 @@ public class Worker : BackgroundService
     {
         Console.WriteLine($">>> [DEBUG] Phone Link connection changed event received: Connected = {connected}");
         _logger.LogInformation($"Phone Link connection changed: Connected = {connected}");
-        if (connected)
-        {
-            _ = EvaluateAndRecoverAsync();
-        }
+        _ = EvaluateAndRecoverAsync();
     }
 
     private void OnNetworkStateChanged(object? sender, NetworkState state)
@@ -103,7 +100,7 @@ public class Worker : BackgroundService
             _logger.LogInformation("System resumed from sleep. Triggering stabilization and recovery...");
             _ = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(5));
+                await Task.Delay(TimeSpan.FromSeconds(3));
                 _scheduledOffTriggeredToday = false;
                 await EvaluateAndRecoverAsync();
             });
@@ -126,37 +123,76 @@ public class Worker : BackgroundService
                 return;
             }
 
-            // Check scheduled turn-off time
-            if (DateTime.Today != _lastDayChecked)
+            // Calendar-aware day check
+            var today = DateTime.Today;
+            if (today != _lastDayChecked)
             {
-                _lastDayChecked = DateTime.Today;
+                _lastDayChecked = today;
                 _scheduledOffTriggeredToday = false;
             }
 
-            if (!_scheduledOffTriggeredToday && TimeSpan.TryParse(settings.TurnOffTime, out var turnOffTime))
+            bool isDayEnabled = today.DayOfWeek switch
             {
-                var now = DateTime.Now.TimeOfDay;
+                DayOfWeek.Monday => settings.EnableMonday,
+                DayOfWeek.Tuesday => settings.EnableTuesday,
+                DayOfWeek.Wednesday => settings.EnableWednesday,
+                DayOfWeek.Thursday => settings.EnableThursday,
+                DayOfWeek.Friday => settings.EnableFriday,
+                DayOfWeek.Saturday => settings.EnableSaturday,
+                DayOfWeek.Sunday => settings.EnableSunday,
+                _ => true
+            };
+
+            var now = DateTime.Now.TimeOfDay;
+            bool hasStopReached = false;
+            if (TimeSpan.TryParse(settings.TurnOffTime, out var turnOffTime))
+            {
                 if (now >= turnOffTime)
                 {
-                    Console.WriteLine($">>> [SCHEDULE] Current time {now:hh\\:mm} has reached or passed scheduled turn-off time {settings.TurnOffTime}. Turning OFF Mobile Hotspot.");
-                    _logger.LogInformation($"Scheduled turn-off time reached ({settings.TurnOffTime}). Disabling Mobile Hotspot.");
-                    await _hotspotManager.DisableAsync(cancellationToken);
-                    _scheduledOffTriggeredToday = true;
-                    return;
+                    hasStopReached = true;
                 }
             }
 
-            // Check Windows Phone Link status
-            bool phoneLinkConnected = await _phoneLinkMonitor.IsPhoneLinkConnectedAsync(cancellationToken);
-            var hotspotStatus = await _hotspotManager.GetStatusAsync(cancellationToken);
-            Console.WriteLine($">>> [DEBUG] Phone Link connected: {phoneLinkConnected}, Hotspot status: {hotspotStatus}, Scheduled off today: {_scheduledOffTriggeredToday}");
-
-            if (phoneLinkConnected && hotspotStatus == HotspotStatus.Off && !_scheduledOffTriggeredToday)
+            // 1. If scheduled stop time reached, turn off hotspot
+            if (hasStopReached && !_scheduledOffTriggeredToday)
             {
-                _logger.LogInformation("Phone Link connected and hotspot is OFF. Enabling Mobile Hotspot...");
-                Console.WriteLine(">>> [DEBUG] Phone Link connected and hotspot is OFF. Enabling Mobile Hotspot...");
+                Console.WriteLine($">>> [SCHEDULE] Current time {now:hh\\:mm} reached or passed stop time {settings.TurnOffTime}. Turning OFF Mobile Hotspot.");
+                _logger.LogInformation($"Scheduled stop time reached ({settings.TurnOffTime}). Disabling Mobile Hotspot.");
+                await _hotspotManager.DisableAsync(cancellationToken);
+                _scheduledOffTriggeredToday = true;
+                return;
+            }
+
+            // 2. Check Phone Link connection state
+            bool phoneConnected = await _phoneLinkMonitor.IsPhoneLinkConnectedAsync(cancellationToken);
+            var hotspotStatus = await _hotspotManager.GetStatusAsync(cancellationToken);
+            Console.WriteLine($">>> [DEBUG] Phone connected: {phoneConnected}, Hotspot status: {hotspotStatus}, Day enabled: {isDayEnabled}, Stop reached: {hasStopReached}, Scheduled off today: {_scheduledOffTriggeredToday}");
+
+            if (!isDayEnabled)
+            {
+                Console.WriteLine(">>> [SCHEDULE] Today is not enabled in schedule. Hotspot automation inactive.");
+                return;
+            }
+
+            if (hasStopReached)
+            {
+                Console.WriteLine(">>> [SCHEDULE] Scheduled window has ended. Hotspot remains OFF for new connections tonight.");
+                return;
+            }
+
+            // Start condition: Phone connects and stop not reached and day enabled and not scheduled off
+            if (phoneConnected && hotspotStatus == HotspotStatus.Off && !hasStopReached && !_scheduledOffTriggeredToday)
+            {
+                _logger.LogInformation("Phone connected to Phone Link during active schedule window. Enabling Mobile Hotspot...");
+                Console.WriteLine(">>> [DEBUG] Phone connected and hotspot OFF. Turning hotspot ON.");
                 bool success = await _hotspotManager.EnableAsync(cancellationToken);
                 Console.WriteLine($">>> [DEBUG] EnableAsync result: {success}");
+            }
+            else if (!phoneConnected && hotspotStatus == HotspotStatus.On && settings.DisableOnDisconnect)
+            {
+                Console.WriteLine(">>> [DEBUG] Phone disconnected from Phone Link and DisableOnDisconnect is enabled. Turning hotspot OFF.");
+                _logger.LogInformation("Phone disconnected from Phone Link. Disabling Mobile Hotspot.");
+                await _hotspotManager.DisableAsync(cancellationToken);
             }
         }
         catch (Exception ex)

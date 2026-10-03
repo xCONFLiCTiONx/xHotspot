@@ -35,6 +35,10 @@ public class StatusDto
     public string WifiSsid { get; set; } = string.Empty;
     public bool InternetConnected { get; set; }
     public string PhoneName { get; set; } = string.Empty;
+    public string RemoteSystemId { get; set; } = string.Empty;
+    public bool RemoteSystemAvailable { get; set; }
+    public string IdentityConfidence { get; set; } = "Unknown";
+    public string TurnOffTime { get; set; } = "23:00";
     public BluetoothDeviceState PhoneBluetoothState { get; set; }
     public bool AutomationPaused { get; set; }
     public string LastError { get; set; } = string.Empty;
