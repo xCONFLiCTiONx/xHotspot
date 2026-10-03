@@ -1,0 +1,46 @@
+<Window x:Class="xHotspot.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:xHotspot.App.ViewModels"
+        mc:Ignorable="d"
+        Title="xHotspot — Automatic Mobile Hotspot Manager" Height="450" Width="400"
+        Background="#F3F3F3">
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
+    <Grid Margin="20">
+        <StackPanel>
+            <TextBlock Text="xHotspot" FontSize="22" FontWeight="Bold" Foreground="#1E1E1E"/>
+            <TextBlock Text="Automatic Mobile Hotspot Manager" FontSize="12" Foreground="#666666" Margin="0,0,0,15"/>
+
+            <Border Background="White" CornerRadius="8" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="Service Status:" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding ServiceStatus}" HorizontalAlignment="Right" Foreground="Green"/>
+                    </DockPanel>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="Internet / Wi-Fi:" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding WifiSsid}" HorizontalAlignment="Right"/>
+                    </DockPanel>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="Configured Phone:" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding PhoneName}" HorizontalAlignment="Right"/>
+                    </DockPanel>
+                    <DockPanel>
+                        <TextBlock Text="Mobile Hotspot:" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding HotspotStatus}" HorizontalAlignment="Right" FontWeight="Bold"/>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <WrapPanel HorizontalAlignment="Center" Margin="0,20,0,0">
+                <Button Content="Enable Hotspot" Command="{Binding EnableHotspotCommand}" Width="110" Height="30" Margin="5"/>
+                <Button Content="Disable Hotspot" Command="{Binding DisableHotspotCommand}" Width="110" Height="30" Margin="5"/>
+                <Button Content="Toggle Automation" Command="{Binding ToggleAutomationCommand}" Width="130" Height="30" Margin="5"/>
+            </WrapPanel>
+        </StackPanel>
+    </Grid>
+</Window>
