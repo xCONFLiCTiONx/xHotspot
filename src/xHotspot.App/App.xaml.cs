@@ -62,12 +62,38 @@ public partial class App : Application
             return;
         }
 
-        // Create Scheduled Task / Registry Startup Entry
-        EnsureStartupTask();
+        if (isStartup)
+        {
+            // Started via --startup argument: run in tray, enable hotspot immediately
+            IsAutoReenableEnabled = true;
+            _ = EnableHotspotAsync();
+        }
+        else
+        {
+            // Started manually: show GUI window IMMEDIATELY without waiting
+            IsAutoReenableEnabled = false;
+            ShowMainWindow();
+        }
 
-        // Listen for IPC signal from secondary instances to show GUI
+        // Run setup tasks asynchronously off the UI thread so GUI appearance is instant
+        Task.Run(() => EnsureStartupTask());
+
+        // Initialize tray icon & IPC signal listener
+        InitializeTrayIcon();
         StartGuiSignalListener();
 
+        // Register power mode change events (e.g., system sleep/resume)
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
+
+        // Register network status change events
+        NetworkInformation.NetworkStatusChanged += OnNetworkStatusChanged;
+
+        // Start background auto-reenable monitoring loop
+        StartMonitoringLoop();
+    }
+
+    private void InitializeTrayIcon()
+    {
         string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
         System.Drawing.Icon trayIcon = File.Exists(iconPath)
             ? new System.Drawing.Icon(iconPath)
@@ -100,28 +126,6 @@ public partial class App : Application
 
         _notifyIcon.ContextMenu = contextMenu;
         _notifyIcon.TrayMouseDoubleClick += (s, args) => ShowMainWindow();
-
-        // Register power mode change events (e.g., system sleep/resume)
-        SystemEvents.PowerModeChanged += OnPowerModeChanged;
-
-        // Register network status change events
-        NetworkInformation.NetworkStatusChanged += OnNetworkStatusChanged;
-
-        // Start background auto-reenable monitoring loop
-        StartMonitoringLoop();
-
-        if (isStartup)
-        {
-            // Started via --startup argument: enable hotspot immediately & run in background
-            IsAutoReenableEnabled = true;
-            _ = EnableHotspotAsync();
-        }
-        else
-        {
-            // Started manually: do NOT auto-connect; open GUI window
-            IsAutoReenableEnabled = false;
-            ShowMainWindow();
-        }
     }
 
     private async Task ExitApplicationAsync()

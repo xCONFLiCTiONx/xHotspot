@@ -16,17 +16,17 @@ public partial class MainViewModel : ObservableObject
     private string _phoneName = "Samsung Galaxy S23 FE";
 
     [ObservableProperty]
-    private string _hotspotStatus = "Off";
+    private string _hotspotStatus = "Checking...";
 
     [ObservableProperty]
     private string _automationStatusText = "Manual Mode";
 
     [ObservableProperty]
-    private string _toggleButtonText = "Enable Hotspot";
+    private string _toggleButtonText = "Loading...";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsNotBusy))]
-    private bool _isBusy;
+    private bool _isBusy = true; // Set busy by default so progress bar shows instantly on launch
 
     public bool IsNotBusy => !IsBusy;
 
@@ -48,26 +48,34 @@ public partial class MainViewModel : ObservableObject
         var app = App.Current;
         if (app == null) return;
 
-        var currentStatus = await app.HotspotManager.GetStatusAsync();
-        HotspotStatus = currentStatus.ToString();
-
-        if (currentStatus == xHotspot.Core.Models.HotspotStatus.TurningOn)
+        try
         {
-            IsBusy = true;
-            ToggleButtonText = "Enabling...";
-            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active" : "Manual Mode";
+            var currentStatus = await app.HotspotManager.GetStatusAsync();
+            HotspotStatus = currentStatus.ToString();
+
+            if (currentStatus == xHotspot.Core.Models.HotspotStatus.TurningOn)
+            {
+                IsBusy = true;
+                ToggleButtonText = "Enabling...";
+                AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active" : "Manual Mode";
+            }
+            else if (currentStatus == xHotspot.Core.Models.HotspotStatus.On)
+            {
+                IsBusy = false;
+                ToggleButtonText = "Disable Hotspot";
+                AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active" : "Manual Mode";
+            }
+            else
+            {
+                if (!app.IsBusy) IsBusy = false;
+                ToggleButtonText = "Enable Hotspot";
+                AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active (Reconnecting...)" : "Manual Mode";
+            }
         }
-        else if (currentStatus == xHotspot.Core.Models.HotspotStatus.On)
+        catch
         {
             IsBusy = false;
-            ToggleButtonText = "Disable Hotspot";
-            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active" : "Manual Mode";
-        }
-        else
-        {
-            if (!app.IsBusy) IsBusy = false;
             ToggleButtonText = "Enable Hotspot";
-            AutomationStatusText = app.IsAutoReenableEnabled ? "Always-On Active (Reconnecting...)" : "Manual Mode";
         }
     }
 
