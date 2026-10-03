@@ -27,7 +27,7 @@ public partial class App : Application
     private readonly LoggerService _logger = new();
 
     public WindowsHotspotManager HotspotManager { get; }
-    public bool IsAutoReenableEnabled { get; set; } = false; // Only true when started with --startup or manually enabled
+    public bool IsAutoReenableEnabled { get; set; } = false;
     public bool IsBusy { get; private set; }
 
     public static new App Current => (App)Application.Current;
@@ -43,8 +43,9 @@ public partial class App : Application
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        bool isStartup = e.Args.Any(a => string.Equals(a, "--startup", StringComparison.OrdinalIgnoreCase) ||
-                                         string.Equals(a, "-startup", StringComparison.OrdinalIgnoreCase));
+        string fullCmdLine = Environment.CommandLine;
+        bool isStartup = e.Args.Any(a => a.Contains("startup", StringComparison.OrdinalIgnoreCase)) ||
+                         fullCmdLine.Contains("startup", StringComparison.OrdinalIgnoreCase);
 
         // Single Instance Check
         _singleInstanceMutex = new Mutex(true, MutexName, out bool createdNew);
@@ -54,7 +55,7 @@ public partial class App : Application
 
             if (!isStartup)
             {
-                // If started without --startup while already running in tray, bring up the existing GUI
+                // If started manually without --startup while already running in tray, bring up the existing GUI
                 SignalPrimaryInstanceToShowGui();
             }
 
@@ -62,25 +63,12 @@ public partial class App : Application
             return;
         }
 
-        if (isStartup)
-        {
-            // Started via --startup argument: run in tray, enable hotspot immediately
-            IsAutoReenableEnabled = true;
-            _ = EnableHotspotAsync();
-        }
-        else
-        {
-            // Started manually: show GUI window IMMEDIATELY without waiting
-            IsAutoReenableEnabled = false;
-            ShowMainWindow();
-        }
-
-        // Run setup tasks asynchronously off the UI thread so GUI appearance is instant
-        Task.Run(() => EnsureStartupTask());
-
-        // Initialize tray icon & IPC signal listener
+        // Initialize tray icon & IPC signal listener FIRST
         InitializeTrayIcon();
         StartGuiSignalListener();
+
+        // Run startup task creation asynchronously off the UI thread
+        Task.Run(() => EnsureStartupTask());
 
         // Register power mode change events (e.g., system sleep/resume)
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
@@ -90,6 +78,19 @@ public partial class App : Application
 
         // Start background auto-reenable monitoring loop
         StartMonitoringLoop();
+
+        if (isStartup)
+        {
+            // Started via --startup: STAY IN SYSTEM TRAY ONLY, ENABLE HOTSPOT IMMEDIATELY, DO NOT SHOW GUI WINDOW
+            IsAutoReenableEnabled = true;
+            _ = EnableHotspotAsync();
+        }
+        else
+        {
+            // Started manually without --startup: show GUI window immediately
+            IsAutoReenableEnabled = false;
+            ShowMainWindow();
+        }
     }
 
     private void InitializeTrayIcon()
