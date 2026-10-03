@@ -3,6 +3,8 @@ using Hardcodet.Wpf.TaskbarNotification;
 using xHotspot.App.Views;
 using xHotspot.Core.Models;
 using xHotspot.App.Services;
+using xHotspot.Core.Hotspot;
+using xHotspot.Core.Services;
 
 namespace xHotspot.App;
 
@@ -12,6 +14,13 @@ public partial class App : Application
     private MainWindow? _mainWindow;
     private System.Windows.Controls.MenuItem? _pauseItem;
     private readonly IpcClient _ipcClient = new();
+    private readonly LoggerService _logger = new();
+    private readonly WindowsHotspotManager _hotspotManager;
+
+    public App()
+    {
+        _hotspotManager = new WindowsHotspotManager(_logger);
+    }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -40,7 +49,7 @@ public partial class App : Application
 
         var enableItem = new System.Windows.Controls.MenuItem { Header = "Enable Hotspot" };
         enableItem.Click += async (s, args) => {
-            await _ipcClient.SendCommandAsync(IpcCommandType.EnableHotspot);
+            await _hotspotManager.EnableAsync();
         };
         contextMenu.Items.Add(enableItem);
 

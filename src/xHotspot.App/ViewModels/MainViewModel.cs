@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using xHotspot.App.Services;
+using xHotspot.Core.Hotspot;
 using xHotspot.Core.Models;
+using xHotspot.Core.Services;
 
 namespace xHotspot.App.ViewModels;
 
@@ -11,6 +13,8 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly IpcClient _ipcClient = new();
     private readonly DispatcherTimer _timer;
+    private readonly LoggerService _logger = new();
+    private readonly WindowsHotspotManager _hotspotManager;
 
     [ObservableProperty]
     private string _serviceStatus = "Running";
@@ -41,6 +45,8 @@ public partial class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
+        _hotspotManager = new WindowsHotspotManager(_logger);
+
         _timer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(3)
@@ -55,13 +61,16 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task RefreshStatusAsync()
     {
+        // Query status directly via WindowsHotspotManager in user session for real-time accuracy
+        var status = await _hotspotManager.GetStatusAsync();
+        HotspotStatus = status.ToString();
+
         var resp = await _ipcClient.SendCommandAsync(IpcCommandType.GetStatus);
         if (resp.Success && !string.IsNullOrEmpty(resp.DataJson))
         {
             var dto = System.Text.Json.JsonSerializer.Deserialize<StatusDto>(resp.DataJson);
             if (dto != null)
             {
-                HotspotStatus = dto.HotspotStatus.ToString();
                 WifiSsid = string.IsNullOrEmpty(dto.WifiSsid) ? "Connected" : dto.WifiSsid;
                 InternetConnected = dto.InternetConnected;
                 PhoneName = string.IsNullOrEmpty(dto.PhoneName) ? "Samsung Galaxy S23 FE" : dto.PhoneName;
@@ -75,14 +84,16 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task EnableHotspotAsync()
     {
-        await _ipcClient.SendCommandAsync(IpcCommandType.EnableHotspot);
+        Console.WriteLine(">>> [GUI] Enable Hotspot clicked. Executing directly in user session...");
+        await _hotspotManager.EnableAsync();
         await RefreshStatusAsync();
     }
 
     [RelayCommand]
     private async Task DisableHotspotAsync()
     {
-        await _ipcClient.SendCommandAsync(IpcCommandType.DisableHotspot);
+        Console.WriteLine(">>> [GUI] Disable Hotspot clicked. Executing directly in user session...");
+        await _hotspotManager.DisableAsync();
         await RefreshStatusAsync();
     }
 
