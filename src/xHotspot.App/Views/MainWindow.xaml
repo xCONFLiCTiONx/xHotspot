@@ -6,6 +6,7 @@
         xmlns:vm="clr-namespace:xHotspot.App.ViewModels"
         mc:Ignorable="d"
         Title="xHotspot — Always-On Mobile Hotspot Manager" Height="420" Width="420"
+        Icon="icon.ico"
         Background="#1E1E1E" Foreground="White" WindowStartupLocation="CenterScreen">
     <Window.DataContext>
         <vm:MainViewModel/>

@@ -19,10 +19,15 @@ public partial class App : Application
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+        string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+        System.Drawing.Icon trayIcon = System.IO.File.Exists(iconPath)
+            ? new System.Drawing.Icon(iconPath)
+            : System.Drawing.SystemIcons.Application;
+
         _notifyIcon = new TaskbarIcon
         {
             ToolTipText = "xHotspot — Always-On Mobile Hotspot",
-            Icon = System.Drawing.SystemIcons.Application
+            Icon = trayIcon
         };
 
         var contextMenu = new System.Windows.Controls.ContextMenu();
