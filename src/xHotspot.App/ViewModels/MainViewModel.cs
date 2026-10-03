@@ -28,6 +28,12 @@ public partial class MainViewModel : ObservableObject
     private bool _automationPaused;
 
     [ObservableProperty]
+    private string _automationStatusText = "Active";
+
+    [ObservableProperty]
+    private string _automationButtonText = "Pause Automation";
+
+    [ObservableProperty]
     private bool _internetConnected = true;
 
     [ObservableProperty]
@@ -60,6 +66,8 @@ public partial class MainViewModel : ObservableObject
                 InternetConnected = dto.InternetConnected;
                 PhoneName = string.IsNullOrEmpty(dto.PhoneName) ? "Galaxy S23 FE" : dto.PhoneName;
                 AutomationPaused = dto.AutomationPaused;
+                AutomationStatusText = AutomationPaused ? "Paused" : "Active";
+                AutomationButtonText = AutomationPaused ? "Resume Automation" : "Pause Automation";
             }
         }
     }

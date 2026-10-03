@@ -5,41 +5,73 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:xHotspot.App.ViewModels"
         mc:Ignorable="d"
-        Title="xHotspot — Automatic Mobile Hotspot Manager" Height="450" Width="400"
-        Background="#F3F3F3">
+        Title="xHotspot — Automatic Mobile Hotspot Manager" Height="460" Width="420"
+        Background="#1E1E1E" Foreground="White" WindowStartupLocation="CenterScreen">
     <Window.DataContext>
         <vm:MainViewModel/>
     </Window.DataContext>
+
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#2D2D2D"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#3F3F3F"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,6"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3E3E3E"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="20">
         <StackPanel>
-            <TextBlock Text="xHotspot" FontSize="22" FontWeight="Bold" Foreground="#1E1E1E"/>
-            <TextBlock Text="Automatic Mobile Hotspot Manager" FontSize="12" Foreground="#666666" Margin="0,0,0,15"/>
+            <TextBlock Text="xHotspot" FontSize="22" FontWeight="Bold" Foreground="White"/>
+            <TextBlock Text="Automatic Mobile Hotspot Manager" FontSize="12" Foreground="#AAAAAA" Margin="0,0,0,15"/>
 
-            <Border Background="White" CornerRadius="8" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
+            <Border Background="#252526" CornerRadius="8" Padding="15" BorderBrush="#333333" BorderThickness="1">
                 <StackPanel>
-                    <DockPanel Margin="0,0,0,8">
-                        <TextBlock Text="Service Status:" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding ServiceStatus}" HorizontalAlignment="Right" Foreground="Green"/>
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock Text="Service Status:" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <TextBlock Text="{Binding ServiceStatus}" HorizontalAlignment="Right" Foreground="#4CAF50" FontWeight="Bold"/>
                     </DockPanel>
-                    <DockPanel Margin="0,0,0,8">
-                        <TextBlock Text="Internet / Wi-Fi:" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding WifiSsid}" HorizontalAlignment="Right"/>
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock Text="Automation:" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <TextBlock Text="{Binding AutomationStatusText}" HorizontalAlignment="Right" Foreground="#2196F3" FontWeight="Bold"/>
                     </DockPanel>
-                    <DockPanel Margin="0,0,0,8">
-                        <TextBlock Text="Configured Phone:" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding PhoneName}" HorizontalAlignment="Right"/>
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock Text="Internet / Wi-Fi:" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <TextBlock Text="{Binding WifiSsid}" HorizontalAlignment="Right" Foreground="White"/>
+                    </DockPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock Text="Configured Phone:" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <TextBlock Text="{Binding PhoneName}" HorizontalAlignment="Right" Foreground="White"/>
                     </DockPanel>
                     <DockPanel>
-                        <TextBlock Text="Mobile Hotspot:" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding HotspotStatus}" HorizontalAlignment="Right" FontWeight="Bold"/>
+                        <TextBlock Text="Mobile Hotspot:" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <TextBlock Text="{Binding HotspotStatus}" HorizontalAlignment="Right" Foreground="#FF9800" FontWeight="Bold"/>
                     </DockPanel>
                 </StackPanel>
             </Border>
 
             <WrapPanel HorizontalAlignment="Center" Margin="0,20,0,0">
-                <Button Content="Enable Hotspot" Command="{Binding EnableHotspotCommand}" Width="110" Height="30" Margin="5"/>
-                <Button Content="Disable Hotspot" Command="{Binding DisableHotspotCommand}" Width="110" Height="30" Margin="5"/>
-                <Button Content="Toggle Automation" Command="{Binding ToggleAutomationCommand}" Width="130" Height="30" Margin="5"/>
+                <Button Content="Enable Hotspot" Command="{Binding EnableHotspotCommand}" Width="120" Height="32" Margin="5"/>
+                <Button Content="Disable Hotspot" Command="{Binding DisableHotspotCommand}" Width="120" Height="32" Margin="5"/>
+                <Button Content="{Binding AutomationButtonText}" Command="{Binding ToggleAutomationCommand}" Width="255" Height="32" Margin="5"/>
             </WrapPanel>
         </StackPanel>
     </Grid>
