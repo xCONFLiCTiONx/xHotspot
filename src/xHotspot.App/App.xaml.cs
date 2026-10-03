@@ -1,5 +1,7 @@
 using System.IO;
+using System.IO.Pipes;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Win32;
@@ -14,6 +16,10 @@ namespace xHotspot.App;
 
 public partial class App : Application
 {
+    private static Mutex? _singleInstanceMutex;
+    private const string MutexName = "Global\\xHotspot_SingleInstance_Mutex";
+    private const string PipeName = "xHotspot_GuiSignal_Pipe";
+
     private TaskbarIcon? _notifyIcon;
     private MainWindow? _mainWindow;
     private System.Windows.Controls.MenuItem? _toggleMenuItem;
@@ -38,6 +44,28 @@ public partial class App : Application
 
         bool isStartup = e.Args.Any(a => string.Equals(a, "--startup", StringComparison.OrdinalIgnoreCase) ||
                                          string.Equals(a, "-startup", StringComparison.OrdinalIgnoreCase));
+
+        // Single Instance Check
+        _singleInstanceMutex = new Mutex(true, MutexName, out bool createdNew);
+        if (!createdNew)
+        {
+            _logger.LogInformation("Another instance of xHotspot is already running.");
+
+            if (!isStartup)
+            {
+                // If started without --startup while already running in tray, bring up the existing GUI
+                SignalPrimaryInstanceToShowGui();
+            }
+
+            Current.Shutdown();
+            return;
+        }
+
+        // Create Scheduled Task / Registry Startup Entry
+        EnsureStartupTask();
+
+        // Listen for IPC signal from secondary instances to show GUI
+        StartGuiSignalListener();
 
         string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
         System.Drawing.Icon trayIcon = File.Exists(iconPath)
@@ -93,6 +121,67 @@ public partial class App : Application
         {
             // Started manually: open GUI window directly
             ShowMainWindow();
+        }
+    }
+
+    private static void SignalPrimaryInstanceToShowGui()
+    {
+        try
+        {
+            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
+            client.Connect(1000);
+        }
+        catch { }
+    }
+
+    private void StartGuiSignalListener()
+    {
+        Task.Run(async () =>
+        {
+            while (true)
+            {
+                try
+                {
+                    using var server = new NamedPipeServerStream(PipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                    await server.WaitForConnectionAsync();
+                    Dispatcher.Invoke(() => ShowMainWindow());
+                }
+                catch
+                {
+                    await Task.Delay(1000);
+                }
+            }
+        });
+    }
+
+    private void EnsureStartupTask()
+    {
+        try
+        {
+            string? exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+            if (string.IsNullOrEmpty(exePath))
+            {
+                exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "xHotspot.App.exe");
+            }
+
+            // 1. HKCU Registry Run Key
+            using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+            {
+                key?.SetValue("xHotspot", $"\"{exePath}\" --startup");
+            }
+
+            // 2. Task Scheduler Task via schtasks.exe
+            string trArgument = $"\"\"{exePath}\" --startup\"";
+            var psi = new System.Diagnostics.ProcessStartInfo("schtasks.exe", $"/Create /TN \"xHotspot\" /TR {trArgument} /SC ONLOGON /F")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error setting up startup scheduled task/registry", ex);
         }
     }
 
@@ -217,6 +306,14 @@ public partial class App : Application
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         NetworkInformation.NetworkStatusChanged -= OnNetworkStatusChanged;
         _notifyIcon?.Dispose();
+        if (_singleInstanceMutex != null)
+        {
+            try
+            {
+                _singleInstanceMutex.ReleaseMutex();
+            }
+            catch { }
+        }
         base.OnExit(e);
     }
 }
