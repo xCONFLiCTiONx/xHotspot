@@ -7,11 +7,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
     <PackageReference Include="Microsoft.Win32.SystemEvents" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.0.4" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.Windows.SDK.NET.Ref" />
   </ItemGroup>
 
   <ItemGroup>

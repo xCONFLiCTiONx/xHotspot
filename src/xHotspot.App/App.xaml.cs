@@ -32,6 +32,9 @@ public partial class App : Application
 
     public static new App Current => (App)Application.Current;
 
+    [System.Runtime.InteropServices.DllImport("shell32.dll", SetLastError = true)]
+    private static extern void SetCurrentProcessExplicitAppUserModelID([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string AppID);
+
     public App()
     {
         HotspotManager = new WindowsHotspotManager(_logger);
@@ -40,6 +43,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        try
+        {
+            SetCurrentProcessExplicitAppUserModelID("xHotspot.App.v1");
+        }
+        catch { }
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
@@ -93,11 +102,11 @@ public partial class App : Application
         }
     }
 
-    private System.Drawing.Icon GetAppIcon()
+    public System.Drawing.Icon GetAppIcon()
     {
         try
         {
-            var streamInfo = Application.GetResourceStream(new Uri("pack://application:,,,/logo.ico"));
+            var streamInfo = Application.GetResourceStream(new Uri("pack://application:,,,/icon.ico"));
             if (streamInfo != null)
             {
                 using var stream = streamInfo.Stream;
@@ -108,7 +117,7 @@ public partial class App : Application
 
         try
         {
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
             if (File.Exists(iconPath))
             {
                 return new System.Drawing.Icon(iconPath);
