@@ -15,32 +15,29 @@ public class WindowsHotspotManager : IHotspotManager
 
     public async Task<HotspotStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
-        try
+        var psi = new ProcessStartInfo
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "netsh",
-                Arguments = "wlan show hostednetwork",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+            FileName = "netsh",
+            Arguments = "wlan show hostednetwork",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
 
-            using var p = Process.Start(psi);
-            if (p != null)
-            {
-                string output = await p.StandardOutput.ReadToEndAsync();
-                await p.WaitForExitAsync(cancellationToken);
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start netsh process.");
+        string output = await p.StandardOutput.ReadToEndAsync(cancellationToken);
+        string error = await p.StandardError.ReadToEndAsync(cancellationToken);
+        await p.WaitForExitAsync(cancellationToken);
 
-                if (output.Contains("Started") || output.Contains("Running"))
-                {
-                    return HotspotStatus.On;
-                }
-            }
+        if (!string.IsNullOrEmpty(error))
+        {
+            Console.WriteLine($"[NETSH ERROR] {error}");
         }
-        catch (Exception ex)
+
+        if (output.Contains("Started") || output.Contains("Running"))
         {
-            _logger.LogDebug($"Could not query hosted network status: {ex.Message}");
+            return HotspotStatus.On;
         }
 
         return HotspotStatus.Off;
@@ -48,48 +45,38 @@ public class WindowsHotspotManager : IHotspotManager
 
     public async Task<bool> EnableAsync(CancellationToken cancellationToken = default)
     {
-        try
+        _logger.LogInformation("Enabling Windows Mobile Hotspot...");
+
+        var psi = new ProcessStartInfo
         {
-            _logger.LogInformation("Enabling Windows Mobile Hotspot...");
+            FileName = "powershell",
+            Arguments = "-Command \"(Get-NetConnectionProfile).InterfaceAlias\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell",
-                Arguments = "-Command \"(Get-NetConnectionProfile).InterfaceAlias\"",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start powershell process.");
+        string output = await p.StandardOutput.ReadToEndAsync(cancellationToken);
+        string error = await p.StandardError.ReadToEndAsync(cancellationToken);
+        await p.WaitForExitAsync(cancellationToken);
 
-            using var p = Process.Start(psi);
-            if (p != null)
-            {
-                await p.WaitForExitAsync(cancellationToken);
-            }
-
-            _logger.LogInformation("Mobile Hotspot enable command executed.");
-            return true;
-        }
-        catch (Exception ex)
+        if (!string.IsNullOrEmpty(error))
         {
-            _logger.LogError("Failed to enable Mobile Hotspot", ex);
-            return false;
+            Console.WriteLine($"[POWERSHELL ERROR] {error}");
+            throw new InvalidOperationException($"PowerShell error: {error}");
         }
+
+        _logger.LogInformation($"Mobile Hotspot enable command executed. Output: {output.Trim()}");
+        return true;
     }
 
     public async Task<bool> DisableAsync(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogInformation("Disabling Windows Mobile Hotspot...");
-            await Task.Delay(200, cancellationToken);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to disable Mobile Hotspot", ex);
-            return false;
-        }
+        _logger.LogInformation("Disabling Windows Mobile Hotspot...");
+        await Task.Delay(200, cancellationToken);
+        return true;
     }
 
     public Task<bool> IsApiAvailableAsync(CancellationToken cancellationToken = default)

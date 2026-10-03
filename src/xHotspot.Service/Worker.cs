@@ -35,6 +35,7 @@ public class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("xHotspot service starting...");
+        Console.WriteLine(">>> [DEBUG] xHotspot Service Worker starting execution loop...");
 
         try
         {
@@ -57,11 +58,13 @@ public class Worker : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // Graceful shutdown
+            Console.WriteLine(">>> [DEBUG] xHotspot Service Worker cancelled.");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($">>> [FATAL WORKER ERROR] {ex}");
             _logger.LogCritical("Unhandled exception in Worker background loop", ex);
+            throw; // Do not swallow exceptions in debug mode
         }
         finally
         {
@@ -75,12 +78,14 @@ public class Worker : BackgroundService
 
     private void OnDeviceStateChanged(object? sender, BluetoothDeviceItem e)
     {
+        Console.WriteLine($">>> [DEBUG] Device state changed event received: {e.Name} (Connected: {e.IsConnected})");
         _logger.LogInformation($"Device state changed: {e.Name} (Connected: {e.IsConnected})");
         _ = EvaluateAndRecoverAsync();
     }
 
     private void OnNetworkStateChanged(object? sender, NetworkState state)
     {
+        Console.WriteLine($">>> [DEBUG] Network state changed event received: {state}");
         _logger.LogInformation($"Network state changed: {state}");
         _ = EvaluateAndRecoverAsync();
     }
@@ -89,6 +94,7 @@ public class Worker : BackgroundService
     {
         if (e.Mode == PowerModes.Resume)
         {
+            Console.WriteLine(">>> [DEBUG] Power mode resume detected.");
             _logger.LogInformation("System resumed from sleep. Triggering stabilization and recovery...");
             _ = Task.Run(async () =>
             {
@@ -110,26 +116,36 @@ public class Worker : BackgroundService
             var settings = _settingsService.LoadSettings();
             if (!settings.Enabled || settings.AutomationPaused)
             {
+                Console.WriteLine(">>> [DEBUG] Automation is disabled or paused.");
                 return;
             }
 
             if (!string.IsNullOrEmpty(settings.PhoneDeviceId))
             {
+                Console.WriteLine($">>> [DEBUG] Checking state for configured phone ID: {settings.PhoneDeviceId}");
                 var phoneState = await _bluetoothMonitor.GetDeviceStateAsync(settings.PhoneDeviceId, cancellationToken);
                 bool phonePresent = phoneState != null && (phoneState.IsConnected || phoneState.State == BluetoothDeviceState.Connected);
 
                 var hotspotStatus = await _hotspotManager.GetStatusAsync(cancellationToken);
+                Console.WriteLine($">>> [DEBUG] Phone present: {phonePresent}, Hotspot status: {hotspotStatus}");
 
                 if (phonePresent && hotspotStatus == HotspotStatus.Off)
                 {
                     _logger.LogInformation("Phone present and hotspot is OFF. Enabling Mobile Hotspot...");
+                    Console.WriteLine(">>> [DEBUG] Phone present and hotspot is OFF. Enabling Mobile Hotspot...");
                     await _hotspotManager.EnableAsync(cancellationToken);
                 }
+            }
+            else
+            {
+                Console.WriteLine(">>> [DEBUG] No configured phone device ID in settings.");
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[RECOVERY EVALUATION ERROR] {ex}");
             _logger.LogError("Error during recovery evaluation", ex);
+            throw; // Surface errors in debug mode
         }
         finally
         {

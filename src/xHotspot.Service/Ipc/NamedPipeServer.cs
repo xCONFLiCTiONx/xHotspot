@@ -69,6 +69,7 @@ public class NamedPipeServer
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[NAMED PIPE SERVER ERROR] {ex}");
                 _logger.LogError("Error in NamedPipe server loop", ex);
                 await Task.Delay(1000, cancellationToken);
             }
@@ -94,6 +95,7 @@ public class NamedPipeServer
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[IPC CLIENT HANDLER ERROR] {ex}");
             _logger.LogError("Error handling IPC client", ex);
         }
     }
@@ -159,7 +161,9 @@ public class NamedPipeServer
         }
         catch (Exception ex)
         {
-            return new IpcResponse { Success = false, ErrorMessage = ex.Message };
+            Console.WriteLine($"[IPC COMMAND ERROR] Command {request.Command}: {ex}");
+            _logger.LogError($"IPC Command {request.Command} failed", ex);
+            return new IpcResponse { Success = false, ErrorMessage = ex.ToString() };
         }
     }
 }
