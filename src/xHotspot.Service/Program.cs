@@ -26,6 +26,24 @@ public class Program
             return 0;
         }
 
+        if (args.Contains("--test-hotspot"))
+        {
+            await RunHotspotActivationTestAsync();
+            return 0;
+        }
+
+        if (args.Contains("--enable-hotspot"))
+        {
+            await RunEnableHotspotTestAsync();
+            return 0;
+        }
+
+        if (args.Contains("--disable-hotspot"))
+        {
+            await RunDisableHotspotTestAsync();
+            return 0;
+        }
+
         bool isConsole = args.Contains("--console") || !Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService();
 
         var builder = Host.CreateDefaultBuilder(args)
@@ -120,5 +138,105 @@ public class Program
             Console.WriteLine($"[PHONE DIAGNOSTICS ERROR]: {ex}");
         }
         Console.WriteLine("=============================================================");
+    }
+
+    private static async Task RunHotspotActivationTestAsync()
+    {
+        Console.WriteLine("=== xHotspot Standalone Hotspot Activation Test ===");
+        var logger = new LoggerService();
+        var manager = new WindowsHotspotManager(logger);
+
+        Console.WriteLine("1. Detecting current Mobile Hotspot state...");
+        var initialState = await manager.GetStatusAsync();
+        Console.WriteLine($"   Initial State: {initialState}");
+
+        Console.WriteLine("2. Requesting hotspot activation...");
+        bool enableSuccess = await manager.EnableAsync();
+        Console.WriteLine($"   Activation request result: {enableSuccess}");
+
+        Console.WriteLine("3. Waiting 3 seconds for Windows to complete operation...");
+        await Task.Delay(3000);
+
+        Console.WriteLine("4. Verifying actual enabled state...");
+        var postEnableState = await manager.GetStatusAsync();
+        Console.WriteLine($"   Post-Activation State: {postEnableState}");
+
+        if (postEnableState == HotspotStatus.On)
+        {
+            Console.WriteLine("   -> SUCCESS: Hotspot is actually ENABLED.");
+        }
+        else
+        {
+            Console.WriteLine("   -> FAILURE: Hotspot failed to activate or verify as Enabled.");
+        }
+
+        Console.WriteLine("5. Requesting hotspot deactivation...");
+        bool disableSuccess = await manager.DisableAsync();
+        Console.WriteLine($"   Deactivation request result: {disableSuccess}");
+
+        Console.WriteLine("6. Waiting 3 seconds for deactivation...");
+        await Task.Delay(3000);
+
+        Console.WriteLine("7. Verifying actual disabled state...");
+        var finalState = await manager.GetStatusAsync();
+        Console.WriteLine($"   Final State: {finalState}");
+
+        if (finalState == HotspotStatus.Off)
+        {
+            Console.WriteLine("   -> SUCCESS: Hotspot is actually DISABLED.");
+        }
+        else
+        {
+            Console.WriteLine("   -> WARNING: Hotspot may still be shutting down or requires manual check.");
+        }
+        Console.WriteLine("======================================================");
+    }
+
+    private static async Task RunEnableHotspotTestAsync()
+    {
+        Console.WriteLine("=== xHotspot Enable Hotspot Test (Keep Enabled) ===");
+        var logger = new LoggerService();
+        var manager = new WindowsHotspotManager(logger);
+
+        Console.WriteLine("Requesting hotspot activation...");
+        bool success = await manager.EnableAsync();
+        Console.WriteLine($"Activation request result: {success}");
+
+        await Task.Delay(3000);
+        var state = await manager.GetStatusAsync();
+        Console.WriteLine($"Current Hotspot State: {state}");
+        if (state == HotspotStatus.On)
+        {
+            Console.WriteLine("-> SUCCESS: Hotspot is ENABLED and left running.");
+        }
+        else
+        {
+            Console.WriteLine("-> FAILURE: Hotspot failed to enable.");
+        }
+        Console.WriteLine("=================================================");
+    }
+
+    private static async Task RunDisableHotspotTestAsync()
+    {
+        Console.WriteLine("=== xHotspot Disable Hotspot Test ===");
+        var logger = new LoggerService();
+        var manager = new WindowsHotspotManager(logger);
+
+        Console.WriteLine("Requesting hotspot deactivation...");
+        bool success = await manager.DisableAsync();
+        Console.WriteLine($"Deactivation request result: {success}");
+
+        await Task.Delay(3000);
+        var state = await manager.GetStatusAsync();
+        Console.WriteLine($"Current Hotspot State: {state}");
+        if (state == HotspotStatus.Off)
+        {
+            Console.WriteLine("-> SUCCESS: Hotspot is DISABLED.");
+        }
+        else
+        {
+            Console.WriteLine("-> WARNING: Hotspot may still be stopping.");
+        }
+        Console.WriteLine("======================================");
     }
 }
