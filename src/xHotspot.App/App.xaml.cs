@@ -25,6 +25,7 @@ public partial class App : Application
     private System.Windows.Controls.MenuItem? _toggleMenuItem;
     private readonly IpcClient _ipcClient = new();
     private readonly LoggerService _logger = new();
+    private bool _isSuspended = false;
 
     public WindowsHotspotManager HotspotManager { get; }
     public bool IsAutoReenableEnabled { get; set; } = false;
@@ -320,12 +321,14 @@ public partial class App : Application
         };
         timer.Tick += async (s, e) =>
         {
+            if (_isSuspended) return;
+
             await UpdateTrayMenuAsync();
 
             if (IsAutoReenableEnabled)
             {
                 var status = await HotspotManager.GetStatusAsync();
-                if (status == HotspotStatus.Off)
+                if (status == HotspotStatus.Off && !_isSuspended)
                 {
                     _logger.LogInformation("Always-On check: Hotspot is OFF. Auto-reenabling Mobile Hotspot...");
                     await HotspotManager.EnableAsync();
@@ -338,14 +341,33 @@ public partial class App : Application
 
     private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
     {
-        if (e.Mode == PowerModes.Resume)
+        if (e.Mode == PowerModes.Suspend)
         {
+            _isSuspended = true;
+            _logger.LogInformation("System suspending/entering sleep. Disabling Mobile Hotspot to allow computer sleep...");
+            Console.WriteLine(">>> [APP] Power suspend detected. Disabling Mobile Hotspot...");
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await HotspotManager.DisableAsync();
+                    await UpdateTrayMenuAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Error disabling hotspot on suspend in App", ex);
+                }
+            });
+        }
+        else if (e.Mode == PowerModes.Resume)
+        {
+            _isSuspended = false;
             _logger.LogInformation("System resumed from sleep. Checking Mobile Hotspot status...");
             Console.WriteLine(">>> [APP] Power resume detected. Checking hotspot state...");
             _ = Task.Run(async () =>
             {
-                await Task.Delay(2500); // Allow Wi-Fi / network interfaces to re-initialize
-                if (IsAutoReenableEnabled)
+                await Task.Delay(3500); // Allow Wi-Fi / network interfaces to re-initialize
+                if (IsAutoReenableEnabled && !_isSuspended)
                 {
                     var status = await HotspotManager.GetStatusAsync();
                     if (status == HotspotStatus.Off)
@@ -361,13 +383,17 @@ public partial class App : Application
 
     private void OnNetworkStatusChanged(object? sender)
     {
+        if (_isSuspended) return;
+
         if (IsAutoReenableEnabled)
         {
             _ = Task.Run(async () =>
             {
                 await Task.Delay(1500);
+                if (_isSuspended) return;
+
                 var status = await HotspotManager.GetStatusAsync();
-                if (status == HotspotStatus.Off && IsAutoReenableEnabled)
+                if (status == HotspotStatus.Off && IsAutoReenableEnabled && !_isSuspended)
                 {
                     _logger.LogInformation("Network status change check: Hotspot is OFF. Re-enabling Mobile Hotspot...");
                     await HotspotManager.EnableAsync();

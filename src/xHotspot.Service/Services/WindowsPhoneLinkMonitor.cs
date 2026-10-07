@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Win32;
 using Windows.System.RemoteSystems;
 using xHotspot.Core.Interfaces;
 using xHotspot.Core.Models;
@@ -10,6 +11,7 @@ public class WindowsPhoneLinkMonitor : IPhoneLinkMonitor
     private readonly ILoggerService _logger;
     private readonly ISettingsService _settingsService;
     private bool _lastConnectedState = false;
+    private bool _isSuspended = false;
     private CancellationTokenSource? _cts;
     private Task? _monitorTask;
 
@@ -92,6 +94,7 @@ public class WindowsPhoneLinkMonitor : IPhoneLinkMonitor
     public Task StartMonitoringAsync(CancellationToken cancellationToken = default)
     {
         _cts = new CancellationTokenSource();
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
         _monitorTask = Task.Run(() => MonitorLoop(_cts.Token));
         _logger.LogInformation("WindowsPhoneLinkMonitor started with RemoteSystem support.");
         return Task.CompletedTask;
@@ -99,16 +102,35 @@ public class WindowsPhoneLinkMonitor : IPhoneLinkMonitor
 
     public Task StopMonitoringAsync()
     {
+        SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         _cts?.Cancel();
         _monitorTask?.Wait(TimeSpan.FromSeconds(2));
         _logger.LogInformation("WindowsPhoneLinkMonitor stopped.");
         return Task.CompletedTask;
     }
 
+    private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Suspend)
+        {
+            _isSuspended = true;
+        }
+        else if (e.Mode == PowerModes.Resume)
+        {
+            _isSuspended = false;
+        }
+    }
+
     private async Task MonitorLoop(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
+            if (_isSuspended)
+            {
+                await Task.Delay(3000, cancellationToken);
+                continue;
+            }
+
             try
             {
                 bool connected = await IsPhoneLinkConnectedAsync(cancellationToken);

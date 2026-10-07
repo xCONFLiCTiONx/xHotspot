@@ -15,6 +15,7 @@ public class Worker : BackgroundService
     private readonly INetworkMonitor _networkMonitor;
     private readonly NamedPipeServer _ipcServer;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private bool _isSuspended;
 
     public Worker(
         ILoggerService logger,
@@ -92,13 +93,35 @@ public class Worker : BackgroundService
 
     private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
     {
-        if (e.Mode == PowerModes.Resume)
+        if (e.Mode == PowerModes.Suspend)
         {
-            Console.WriteLine(">>> [DEBUG] Power mode resume detected. Forcing hotspot ON...");
+            _isSuspended = true;
+            Console.WriteLine(">>> [POWER] System suspending/entering sleep. Disabling Mobile Hotspot to allow computer sleep...");
+            _logger.LogInformation("System suspending/entering sleep. Disabling Mobile Hotspot to allow computer sleep.");
+            var settings = _settingsService.LoadSettings();
+            if (settings.TurnOffHotspotOnSleep)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _hotspotManager.DisableAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError("Error disabling hotspot on suspend", ex);
+                    }
+                });
+            }
+        }
+        else if (e.Mode == PowerModes.Resume)
+        {
+            _isSuspended = false;
+            Console.WriteLine(">>> [POWER] System resumed from sleep. Forcing Mobile Hotspot ON...");
             _logger.LogInformation("System resumed from sleep. Forcing Mobile Hotspot ON...");
             _ = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(2));
+                await Task.Delay(TimeSpan.FromSeconds(5));
                 await EvaluateAndRecoverAsync();
             });
         }
@@ -106,6 +129,12 @@ public class Worker : BackgroundService
 
     private async Task EvaluateAndRecoverAsync(CancellationToken cancellationToken = default)
     {
+        if (_isSuspended)
+        {
+            Console.WriteLine(">>> [DEBUG] System is currently suspended/sleeping. Skipping evaluation.");
+            return;
+        }
+
         if (!await _semaphore.WaitAsync(0, cancellationToken))
         {
             return;
@@ -113,6 +142,11 @@ public class Worker : BackgroundService
 
         try
         {
+            if (_isSuspended)
+            {
+                return;
+            }
+
             var settings = _settingsService.LoadSettings();
             if (!settings.Enabled || settings.AutomationPaused)
             {

@@ -6,6 +6,7 @@ public class AppSettings
     public bool AutoStartHotspot { get; set; } = true;
     public bool StartAfterBoot { get; set; } = true;
     public bool RecoverAfterSleep { get; set; } = true;
+    public bool TurnOffHotspotOnSleep { get; set; } = true;
     public bool RecoverAfterNetworkChange { get; set; } = true;
     public bool RecoverAfterBluetoothReconnect { get; set; } = true;
     public string PhoneDeviceId { get; set; } = string.Empty;
