@@ -9,14 +9,6 @@ public class DiagnosticsReport
     public NetworkState WifiState { get; set; } = NetworkState.Disconnected;
     public string WifiSsid { get; set; } = string.Empty;
     public bool InternetConnected { get; set; }
-    public string BluetoothAdapterStatus { get; set; } = string.Empty;
-    public string SelectedPhoneName { get; set; } = string.Empty;
-    public string RemoteSystemId { get; set; } = string.Empty;
-    public bool RemoteSystemAvailable { get; set; }
-    public bool RemoteSystemProximity { get; set; }
-    public string IdentityConfidence { get; set; } = "Unknown";
-    public List<string> DiscoveredRemoteSystems { get; set; } = new();
-    public BluetoothDeviceState PhoneBluetoothState { get; set; } = BluetoothDeviceState.Unknown;
     public HotspotStatus HotspotStatus { get; set; } = HotspotStatus.Off;
     public ServiceState ServiceState { get; set; } = ServiceState.ServiceStarting;
     public TimeSpan ServiceUptime { get; set; }

@@ -11,7 +11,6 @@ public class Worker : BackgroundService
     private readonly ILoggerService _logger;
     private readonly ISettingsService _settingsService;
     private readonly IHotspotManager _hotspotManager;
-    private readonly IPhoneLinkMonitor _phoneLinkMonitor;
     private readonly INetworkMonitor _networkMonitor;
     private readonly NamedPipeServer _ipcServer;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
@@ -21,14 +20,12 @@ public class Worker : BackgroundService
         ILoggerService logger,
         ISettingsService settingsService,
         IHotspotManager hotspotManager,
-        IPhoneLinkMonitor phoneLinkMonitor,
         INetworkMonitor networkMonitor,
         NamedPipeServer ipcServer)
     {
         _logger = logger;
         _settingsService = settingsService;
         _hotspotManager = hotspotManager;
-        _phoneLinkMonitor = phoneLinkMonitor;
         _networkMonitor = networkMonitor;
         _ipcServer = ipcServer;
     }
@@ -42,9 +39,7 @@ public class Worker : BackgroundService
         {
             _ipcServer.Start();
             await _networkMonitor.StartMonitoringAsync(stoppingToken);
-            await _phoneLinkMonitor.StartMonitoringAsync(stoppingToken);
 
-            _phoneLinkMonitor.PhoneLinkConnectionChanged += OnPhoneLinkConnectionChanged;
             _networkMonitor.NetworkStateChanged += OnNetworkStateChanged;
             SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
@@ -70,18 +65,10 @@ public class Worker : BackgroundService
         finally
         {
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
-            await _phoneLinkMonitor.StopMonitoringAsync();
             await _networkMonitor.StopMonitoringAsync();
             _ipcServer.Stop();
             _logger.LogInformation("xHotspot service stopped.");
         }
-    }
-
-    private void OnPhoneLinkConnectionChanged(object? sender, bool connected)
-    {
-        Console.WriteLine($">>> [DEBUG] Phone Link connection changed event received: Connected = {connected}");
-        _logger.LogInformation($"Phone Link connection changed: Connected = {connected}");
-        _ = EvaluateAndRecoverAsync();
     }
 
     private void OnNetworkStateChanged(object? sender, NetworkState state)

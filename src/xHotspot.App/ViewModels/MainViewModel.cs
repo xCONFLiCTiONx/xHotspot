@@ -13,9 +13,6 @@ public partial class MainViewModel : ObservableObject
     private string _wifiSsid = "Connected";
 
     [ObservableProperty]
-    private string _phoneName = "Samsung Galaxy S23 FE";
-
-    [ObservableProperty]
     private string _hotspotStatus = "Checking...";
 
     [ObservableProperty]

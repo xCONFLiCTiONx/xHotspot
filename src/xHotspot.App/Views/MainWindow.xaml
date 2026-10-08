@@ -57,10 +57,6 @@
                         <TextBlock Text="{Binding AutomationStatusText}" HorizontalAlignment="Right" Foreground="#2196F3" FontWeight="Bold"/>
                     </DockPanel>
                     <DockPanel Margin="0,0,0,10">
-                        <TextBlock Text="Configured Phone:" FontWeight="SemiBold" Foreground="#CCCCCC"/>
-                        <TextBlock Text="{Binding PhoneName}" HorizontalAlignment="Right" Foreground="#4CAF50" FontWeight="Bold"/>
-                    </DockPanel>
-                    <DockPanel Margin="0,0,0,10">
                         <TextBlock Text="Network / Wi-Fi:" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         <TextBlock Text="{Binding WifiSsid}" HorizontalAlignment="Right" Foreground="White"/>
                     </DockPanel>

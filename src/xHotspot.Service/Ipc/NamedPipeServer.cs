@@ -14,7 +14,6 @@ public class NamedPipeServer
     private readonly ILoggerService _logger;
     private readonly ISettingsService _settingsService;
     private readonly IHotspotManager _hotspotManager;
-    private readonly IPhoneLinkMonitor _phoneLinkMonitor;
     private readonly INetworkMonitor _networkMonitor;
     private CancellationTokenSource? _cts;
     private Task? _listenerTask;
@@ -23,13 +22,11 @@ public class NamedPipeServer
         ILoggerService logger,
         ISettingsService settingsService,
         IHotspotManager hotspotManager,
-        IPhoneLinkMonitor phoneLinkMonitor,
         INetworkMonitor networkMonitor)
     {
         _logger = logger;
         _settingsService = settingsService;
         _hotspotManager = hotspotManager;
-        _phoneLinkMonitor = phoneLinkMonitor;
         _networkMonitor = networkMonitor;
     }
 
@@ -122,7 +119,6 @@ public class NamedPipeServer
                         WifiState = _networkMonitor.CurrentState,
                         WifiSsid = _networkMonitor.CurrentSsid,
                         InternetConnected = _networkMonitor.IsInternetAvailable,
-                        PhoneName = _settingsService.LoadSettings().PhoneName,
                         AutomationPaused = _settingsService.LoadSettings().AutomationPaused
                     };
                     return new IpcResponse { Success = true, DataJson = JsonSerializer.Serialize(status) };
@@ -140,11 +136,7 @@ public class NamedPipeServer
                     return new IpcResponse { Success = false, ErrorMessage = "Invalid settings payload" };
 
                 case IpcCommandType.GetDevices:
-                    bool plConnected = await _phoneLinkMonitor.IsPhoneLinkConnectedAsync();
-                    var list = new List<BluetoothDeviceItem>
-                    {
-                        new BluetoothDeviceItem { Name = "Windows Phone Link", IsConnected = plConnected }
-                    };
+                    var list = new List<BluetoothDeviceItem>();
                     return new IpcResponse { Success = true, DataJson = JsonSerializer.Serialize(list) };
 
                 case IpcCommandType.EnableHotspot:

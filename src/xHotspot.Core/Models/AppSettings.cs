@@ -8,11 +8,6 @@ public class AppSettings
     public bool RecoverAfterSleep { get; set; } = true;
     public bool TurnOffHotspotOnSleep { get; set; } = true;
     public bool RecoverAfterNetworkChange { get; set; } = true;
-    public bool RecoverAfterBluetoothReconnect { get; set; } = true;
-    public string PhoneDeviceId { get; set; } = string.Empty;
-    public string PhoneName { get; set; } = "Samsung Galaxy S23 FE";
-    public string PhoneManufacturer { get; set; } = "Samsung";
-    public string PhoneModel { get; set; } = "Galaxy S23 FE";
     public int RetryIntervalSeconds { get; set; } = 5;
     public int StartupDelaySeconds { get; set; } = 2;
     public bool AutomationPaused { get; set; } = false;
